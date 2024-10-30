@@ -1,0 +1,84 @@
+{
+  "name": "cgware-vscode-cmake",
+  "displayName": "CMake",
+  "description": "",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.94.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cgware-vscode-cmake.refresh",
+        "title": "Refresh"
+      },
+      {
+        "command": "cgware-vscode-cmake.config",
+        "title": "Config"
+      },
+      {
+        "command": "cgware-vscode-cmake.build",
+        "title": "Build"
+      },
+      {
+        "command": "cgware-vscode-cmake.build.target",
+        "title": "Build Target"
+      },
+      {
+        "command": "cgware-vscode-cmake.run",
+        "title": "Run"
+      },
+      {
+        "command": "cgware-vscode-cmake.run.target",
+        "title": "Run Target"
+      }
+    ],
+    "keybindings": [
+      {
+        "key": "f5",
+        "command": "cgware-vscode-cmake.run"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "cmake-view",
+          "title": "CMake",
+          "icon": "res/icons/cmake.svg"
+        }
+      ]
+    },
+    "views": {
+      "cmake-view": [
+        {
+          "id": "cgware-vscode-cmake.project",
+          "name": "Project"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.94.0",
+    "@types/mocha": "^10.0.9",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^8.10.0",
+    "@typescript-eslint/parser": "^8.7.0",
+    "eslint": "^9.13.0",
+    "typescript": "^5.6.3",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1"
+  }
+}
