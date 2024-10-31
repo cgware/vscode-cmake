@@ -11,10 +11,20 @@ enum CMakeTargetType {
 	RUN,
 }
 
+enum CMakeConfig {
+	DEBUG,
+	RELEASE,
+}
+
+const configs: {[key in CMakeConfig]: string} = {
+	[CMakeConfig.DEBUG]: 'Debug',
+	[CMakeConfig.RELEASE]: 'Release',
+};
+
 abstract class CMakeTarget extends ProjectItem {
 	public name: string;
 	public type: CMakeTargetType;
-	public outDir: string | undefined;
+	public outDir: string[] = new Array(Object.keys(CMakeConfig).length);
 	public outName: string | undefined;
 
 	protected constructor(name: string, type: CMakeTargetType) {
@@ -27,11 +37,11 @@ abstract class CMakeTarget extends ProjectItem {
 		return [];
 	}
 
-	protected build(cmake: CMake, terminal: Terminal) {
-		cmake.build(terminal, this.name);
+	protected build(cmake: CMake, terminal: Terminal, config: CMakeConfig) {
+		cmake.build(terminal, this.name, config);
 	}
 
-	abstract launch(cmake: CMake, terminal: Terminal): void;
+	abstract launch(cmake: CMake, terminal: Terminal, config: CMakeConfig): void;
 
 	equals(other: CMakeTarget | undefined) {
 		return other && this.name === other.name && this.type === other.type;
@@ -48,8 +58,8 @@ class CMakeBuildTarget extends CMakeTarget {
 		};
 	}
 
-	launch(cmake: CMake, terminal: Terminal) {
-		this.build(cmake, terminal);
+	launch(cmake: CMake, terminal: Terminal, config: CMakeConfig) {
+		this.build(cmake, terminal, config);
 	}
 }
 
@@ -61,55 +71,55 @@ class CMakeRunTarget extends CMakeTarget {
 			title: 'Run ' + name,
 			arguments: [this]
 		};
-		this.outDir = outDir;
+		this.outDir.fill(outDir);
 		this.outName = outName;
 	}
 
-	run(cmake: CMake, terminal: Terminal) {
-		this.build(cmake, terminal);
-		cmake.run(terminal, this);
+	run(cmake: CMake, terminal: Terminal, config: CMakeConfig) {
+		this.build(cmake, terminal, config);
+		cmake.run(terminal, this, config);
 	}
 
-	launch(cmake: CMake, terminal: Terminal) {
-		this.run(cmake, terminal);
+	launch(cmake: CMake, terminal: Terminal, config: CMakeConfig) {
+		this.run(cmake, terminal, config);
 	}
 }
 
 class CMake {
-	public root_path: string;
-	public src_path: string;
-	public build_path: string;
+	public rootDir: string;
+	public srcDir: string;
+	public buildDir: string;
 	public files: string[] = [];
 	public targets: CMakeTarget[] = [
 		new CMakeBuildTarget('all'),
 		new CMakeBuildTarget('clean'),
 	];
 
-	constructor(root_path: string) {
-		this.root_path = root_path;
-		this.src_path = root_path;
-		this.build_path = root_path + '/build';
+	constructor(rootDir: string) {
+		this.rootDir = rootDir;
+		this.srcDir = rootDir;
+		this.buildDir = path.join(rootDir, 'build');
 	}
 
-	config(terminal: Terminal) {
-		terminal.exec('cmake -S ' + this.src_path + ' -B ' + this.build_path);
+	generate(terminal: Terminal) {
+		terminal.exec('cmake -S ' + this.srcDir + ' -B ' + this.buildDir);
 	}
 
-	build(terminal: Terminal, target: string) {
-		if (!existsSync(this.build_path)) {
-			this.config(terminal);
+	build(terminal: Terminal, target: string, config: CMakeConfig) {
+		if (!existsSync(this.buildDir)) {
+			this.generate(terminal);
 		}
 
-		terminal.exec('cmake --build ' + this.build_path + ' --target ' + target);
+		terminal.exec('cmake --build ' + this.buildDir + ' --target ' + target + ' --config ' + configs[config]);
 	}
 
-	run(terminal: Terminal, target: CMakeRunTarget) {
+	run(terminal: Terminal, target: CMakeRunTarget, config: CMakeConfig) {
 		if (!target.outDir || !target.outName) {
 			return;
 		}
 
-		let cmd = path.join(target.outDir, target.outName);
-		cmd = cmd.replaceAll('${CMAKE_SOURCE_DIR}', this.src_path);
+		let cmd = path.join(target.outDir[config], target.outName);
+		cmd = cmd.replaceAll('${CMAKE_SOURCE_DIR}', this.srcDir);
 		terminal.exec(cmd);
 	}
 }
@@ -168,6 +178,31 @@ class RunItem extends LaunchItem {
 	}
 }
 
+class ConfigItem extends ProjectItem {
+	constructor(config: CMakeConfig) {
+		super(configs[config], vscode.TreeItemCollapsibleState.None);
+		this.command = {
+			command: 'cgware-vscode-cmake.config',
+			title: configs[config],
+			arguments: [config]
+		};
+	}
+
+	getChildren(): ProjectItem[] {
+		return [];
+	}
+}
+
+class ConfigsItem extends ProjectItem {
+	constructor() {
+		super('Config', vscode.TreeItemCollapsibleState.Expanded);
+	}
+
+	getChildren(): ProjectItem[] {
+		return Object.values(CMakeConfig).map((_, config) => new ConfigItem(config));
+	}
+}
+
 class ProjectProvider implements vscode.TreeDataProvider<ProjectItem> {
 	private _onDidChangeTreeData: vscode.EventEmitter<ProjectItem | undefined | void> = new vscode.EventEmitter<ProjectItem | undefined | void>();
 	readonly onDidChangeTreeData: vscode.Event<ProjectItem | undefined | void> = this._onDidChangeTreeData.event;
@@ -186,6 +221,7 @@ class ProjectProvider implements vscode.TreeDataProvider<ProjectItem> {
 			return [
 				new BuildItem(this.cmake),
 				new RunItem(this.cmake),
+				new ConfigsItem(),
 			];
 		}
 
@@ -208,7 +244,8 @@ export function activate(context: vscode.ExtensionContext) {
 
 	let terminal = new Terminal();
 	let cmake: CMake = new CMake(wf);
-	let last_target: CMakeTarget | undefined;
+	let lastTarget: CMakeTarget | undefined;
+	let lastConfig = CMakeConfig.DEBUG;
 	const projectProvider = new ProjectProvider(cmake);
 
 	cmake_refresh();
@@ -223,7 +260,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	function parse_cmake(subdir: string | undefined, cmake: CMake): CMake {
-		let file_path = path.join(cmake.root_path, ...(subdir ? [subdir] : []), 'CMakeLists.txt');
+		let file_path = path.join(cmake.rootDir, ...(subdir ? [subdir] : []), 'CMakeLists.txt');
 
 		if (!existsSync(file_path)) {
 			return cmake;
@@ -250,7 +287,7 @@ export function activate(context: vscode.ExtensionContext) {
 				case 'add_executable': {
 					cmake.targets.push(...[
 						new CMakeBuildTarget(cmd.args[0]),
-						new CMakeRunTarget(cmd.args[0], path.join(cmake.build_path, ...(subdir ? [subdir] : [])), cmd.args[0]),
+						new CMakeRunTarget(cmd.args[0], path.join(cmake.buildDir, ...(subdir ? [subdir] : [])), cmd.args[0]),
 					]);
 					break;
 				}
@@ -279,16 +316,28 @@ export function activate(context: vscode.ExtensionContext) {
 						let val = cmd.args[i++];
 
 						switch (prop) {
-							case 'RUNTIME_OUTPUT_DIRECTORY': {
+							case 'RUNTIME_OUTPUT_DIRECTORY_DEBUG': {
 								targets
 									.filter(target => target.type === CMakeTargetType.RUN)
-									.forEach((target: CMakeTarget) => target.outDir = val);
+									.forEach((target: CMakeTarget) => target.outDir[CMakeConfig.DEBUG] = val);
 								break;
 							}
-							case 'LIBRARY_OUTPUT_DIRECTORY': {
+							case 'LIBRARY_OUTPUT_DIRECTORY_DEBUG': {
 								targets
 									.filter(target => target.type === CMakeTargetType.BUILD)
-									.forEach((target: CMakeTarget) => target.outDir = val);
+									.forEach((target: CMakeTarget) => target.outDir[CMakeConfig.DEBUG] = val);
+								break;
+							}
+							case 'RUNTIME_OUTPUT_DIRECTORY_RELEASE': {
+								targets
+									.filter(target => target.type === CMakeTargetType.RUN)
+									.forEach((target: CMakeTarget) => target.outDir[CMakeConfig.RELEASE] = val);
+								break;
+							}
+							case 'LIBRARY_OUTPUT_DIRECTORY_RELEASE': {
+								targets
+									.filter(target => target.type === CMakeTargetType.BUILD)
+									.forEach((target: CMakeTarget) => target.outDir[CMakeConfig.RELEASE] = val);
 								break;
 							}
 							case 'OUTPUT_NAME': {
@@ -315,27 +364,28 @@ export function activate(context: vscode.ExtensionContext) {
 		cmake = parse_cmake(undefined, new CMake(wf));
 		projectProvider.setCMake(cmake);
 
-		last_target = cmake.targets.find((item: CMakeTarget) => item.equals(last_target)) || cmake.targets.at(0);
+		lastTarget = cmake.targets.find((item: CMakeTarget) => item.equals(lastTarget)) || cmake.targets.at(0);
 	}
 
 	context.subscriptions.push(...[
 		vscode.commands.registerCommand('cgware-vscode-cmake.refresh', _ => cmake_refresh()),
-		vscode.commands.registerCommand('cgware-vscode-cmake.config', _ => cmake.config(terminal)),
+		vscode.commands.registerCommand('cgware-vscode-cmake.generate', _ => cmake.generate(terminal)),
+		vscode.commands.registerCommand('cgware-vscode-cmake.config', (config: CMakeConfig) => lastConfig = config),
 		vscode.commands.registerCommand('cgware-vscode-cmake.build', (target: CMakeTarget) => {
-			target.launch(cmake, terminal);
-			last_target = target;
+			target.launch(cmake, terminal, lastConfig);
+			lastTarget = target;
 		}),
 		vscode.commands.registerCommand('cgware-vscode-cmake.run', (target: CMakeTarget) => {
-			target.launch(cmake, terminal);
-			last_target = target;
+			target.launch(cmake, terminal, lastConfig);
+			lastTarget = target;
 		}),
 		vscode.commands.registerCommand('cgware-vscode-cmake.launch', _ => {
-			if (!last_target) {
+			if (!lastTarget) {
 				vscode.window.showErrorMessage('No target selected');
 				return;
 			}
 
-			last_target.launch(cmake, terminal);
+			lastTarget.launch(cmake, terminal, lastConfig);
 		}),
 	]);
 

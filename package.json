@@ -3,6 +3,7 @@
   "displayName": "CMake",
   "description": "",
   "version": "0.0.1",
+  "publisher": "cgware",
   "engines": {
     "vscode": "^1.94.0"
   },
@@ -16,6 +17,10 @@
       {
         "command": "cgware-vscode-cmake.refresh",
         "title": "Refresh"
+      },
+      {
+        "command": "cgware-vscode-cmake.generate",
+        "title": "Generate"
       },
       {
         "command": "cgware-vscode-cmake.config",
@@ -43,14 +48,14 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "cmake-view",
+          "id": "cgware-cmake-view",
           "title": "CMake",
           "icon": "res/icons/cmake.svg"
         }
       ]
     },
     "views": {
-      "cmake-view": [
+      "cgware-cmake-view": [
         {
           "id": "cgware-vscode-cmake.project",
           "name": "Project"
