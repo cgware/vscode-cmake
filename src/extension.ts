@@ -30,6 +30,10 @@ abstract class CMakeTarget extends ProjectItem {
 	}
 
 	abstract launch(cmake: CMake, terminal: Terminal): void;
+
+	equals(other: CMakeTarget | undefined) {
+		return other && this.name === other.name && this.type === other.type;
+	}
 }
 
 class CMakeBuildTarget extends CMakeTarget {
@@ -258,10 +262,9 @@ export function activate(context: vscode.ExtensionContext) {
 
 	function cmake_refresh() {
 		cmake = parse_cmake(undefined, new CMake(wf));
-		if (cmake.targets.length > 0) {
-			last_target = cmake.targets.at(0);
-		}
 		projectProvider.setCMake(cmake);
+
+		last_target = cmake.targets.find((item: CMakeTarget) => item.equals(last_target)) || cmake.targets.at(0);
 	}
 
 	context.subscriptions.push(...[
