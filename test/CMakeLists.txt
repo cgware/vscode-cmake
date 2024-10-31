@@ -4,4 +4,5 @@ project(cmake_test LANGUAGES C)
 
 add_executable(main main.c)
 
+add_subdirectory(exes)
 add_subdirectory(libs)
