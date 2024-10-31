@@ -26,22 +26,18 @@
         "title": "Build"
       },
       {
-        "command": "cgware-vscode-cmake.build.target",
-        "title": "Build Target"
-      },
-      {
         "command": "cgware-vscode-cmake.run",
         "title": "Run"
       },
       {
-        "command": "cgware-vscode-cmake.run.target",
-        "title": "Run Target"
+        "command": "cgware-vscode-cmake.launch",
+        "title": "Launch"
       }
     ],
     "keybindings": [
       {
         "key": "f5",
-        "command": "cgware-vscode-cmake.run"
+        "command": "cgware-vscode-cmake.launch"
       }
     ],
     "viewsContainers": {
