@@ -14,6 +14,8 @@ enum CMakeTargetType {
 abstract class CMakeTarget extends ProjectItem {
 	public name: string;
 	public type: CMakeTargetType;
+	public outDir: string | undefined;
+	public outName: string | undefined;
 
 	protected constructor(name: string, type: CMakeTargetType) {
 		super(name, vscode.TreeItemCollapsibleState.None);
@@ -52,21 +54,20 @@ class CMakeBuildTarget extends CMakeTarget {
 }
 
 class CMakeRunTarget extends CMakeTarget {
-	public file: string;
-
-	constructor(name: string, file: string) {
+	constructor(name: string, outDir: string, outName: string) {
 		super(name, CMakeTargetType.RUN);
 		this.command = {
 			command: 'cgware-vscode-cmake.run',
 			title: 'Run ' + name,
 			arguments: [this]
 		};
-		this.file = file;
+		this.outDir = outDir;
+		this.outName = outName;
 	}
 
 	run(cmake: CMake, terminal: Terminal) {
 		this.build(cmake, terminal);
-		terminal.exec(this.file);
+		cmake.run(terminal, this);
 	}
 
 	launch(cmake: CMake, terminal: Terminal) {
@@ -100,6 +101,16 @@ class CMake {
 		}
 
 		terminal.exec('cmake --build ' + this.build_path + ' --target ' + target);
+	}
+
+	run(terminal: Terminal, target: CMakeRunTarget) {
+		if (!target.outDir || !target.outName) {
+			return;
+		}
+
+		let cmd = path.join(target.outDir, target.outName);
+		cmd = cmd.replaceAll('${CMAKE_SOURCE_DIR}', this.src_path);
+		terminal.exec(cmd);
 	}
 }
 
@@ -239,7 +250,7 @@ export function activate(context: vscode.ExtensionContext) {
 				case 'add_executable': {
 					cmake.targets.push(...[
 						new CMakeBuildTarget(cmd.args[0]),
-						new CMakeRunTarget(cmd.args[0], path.join(cmake.build_path, ...(subdir ? [subdir] : []), cmd.args[0])),
+						new CMakeRunTarget(cmd.args[0], path.join(cmake.build_path, ...(subdir ? [subdir] : [])), cmd.args[0]),
 					]);
 					break;
 				}
@@ -249,6 +260,46 @@ export function activate(context: vscode.ExtensionContext) {
 				}
 				case 'add_subdirectory': {
 					parse_cmake(path.join(...(subdir ? [subdir] : []), cmd.args[0]), cmake);
+					break;
+				}
+				case 'set_target_properties': {
+					let targets: CMakeTarget[] = [];
+					let i = 0;
+					while (i < cmd.args.length && cmd.args[i] !== 'PROPERTIES') {
+						targets.push(...cmake.targets.filter((target: CMakeTarget) => target.name === cmd.args[i]));
+						i++;
+					}
+
+					if (cmd.args[i++] !== 'PROPERTIES') {
+						break;
+					}
+
+					while (i < cmd.args.length) {
+						let prop = cmd.args[i++];
+						let val = cmd.args[i++];
+
+						switch (prop) {
+							case 'RUNTIME_OUTPUT_DIRECTORY': {
+								targets
+									.filter(target => target.type === CMakeTargetType.RUN)
+									.forEach((target: CMakeTarget) => target.outDir = val);
+								break;
+							}
+							case 'LIBRARY_OUTPUT_DIRECTORY': {
+								targets
+									.filter(target => target.type === CMakeTargetType.BUILD)
+									.forEach((target: CMakeTarget) => target.outDir = val);
+								break;
+							}
+							case 'OUTPUT_NAME': {
+								targets.forEach((target: CMakeTarget) => target.outName = val);
+								break;
+							}
+							default: {
+								break;
+							}
+						}
+					}
 					break;
 				}
 				default: {
