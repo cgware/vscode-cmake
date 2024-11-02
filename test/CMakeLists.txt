@@ -15,5 +15,9 @@ set_target_properties(main
 	PREFIX ""
 )
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+	target_compile_options(main PRIVATE -O0 -ggdb)
+endif()
+
 add_subdirectory(exes)
 add_subdirectory(libs)

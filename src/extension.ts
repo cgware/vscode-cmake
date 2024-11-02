@@ -16,7 +16,7 @@ enum CMakeConfig {
 	RELEASE,
 }
 
-const configs: {[key in CMakeConfig]: string} = {
+const configs: { [key in CMakeConfig]: string } = {
 	[CMakeConfig.DEBUG]: 'Debug',
 	[CMakeConfig.RELEASE]: 'Release',
 };
@@ -101,13 +101,13 @@ class CMake {
 		this.buildDir = path.join(rootDir, 'build');
 	}
 
-	generate(terminal: Terminal) {
-		terminal.exec('cmake -S ' + this.srcDir + ' -B ' + this.buildDir);
+	generate(terminal: Terminal, config: CMakeConfig) {
+		terminal.exec('cmake -S ' + this.srcDir + ' -B ' + this.buildDir + ' -DCMAKE_BUILD_TYPE=' + configs[config]);
 	}
 
 	build(terminal: Terminal, target: string, config: CMakeConfig) {
 		if (!existsSync(this.buildDir)) {
-			this.generate(terminal);
+			this.generate(terminal, config);
 		}
 
 		terminal.exec('cmake --build ' + this.buildDir + ' --target ' + target + ' --config ' + configs[config]);
@@ -120,33 +120,45 @@ class CMake {
 
 		let cmd = path.join(target.outDir[config], target.outName);
 		cmd = cmd.replaceAll('${CMAKE_SOURCE_DIR}', this.srcDir);
-		terminal.exec(cmd);
+
+		switch (config) {
+			case CMakeConfig.DEBUG: {
+				vscode.debug.startDebugging(undefined, {
+					"type": "cppdbg",
+					"name": "GDB",
+					"request": "launch",
+					"program": cmd,
+					"stopAtEntry": false,
+					"externalConsole": false,
+					"cwd": this.buildDir
+				});
+				break;
+			}
+			case CMakeConfig.RELEASE: {
+				terminal.exec(cmd);
+				break;
+			}
+			default: {
+				break;
+			}
+		}
 	}
 }
 
 class Terminal {
-	private open: Boolean;
-	private terminal: vscode.Terminal;
+	private terminal: vscode.Terminal | undefined;
 
 	constructor() {
-		this.terminal = vscode.window.createTerminal('cmake');
-		this.terminal.show();
-		this.open = true;
-
 		vscode.window.onDidCloseTerminal((closedTerminal) => {
 			if (closedTerminal === this.terminal) {
-				this.open = false;
+				this.terminal = undefined;
 			}
 		});
 	}
 
 	exec(cmd: string) {
-		if (!this.open) {
-			this.terminal = vscode.window.createTerminal('cmake');
-			this.terminal.show();
-			this.open = true;
-		}
-
+		this.terminal = this.terminal || vscode.window.createTerminal('cmake');
+		this.terminal.show();
 		this.terminal.sendText(cmd, true);
 	}
 }
@@ -368,9 +380,15 @@ export function activate(context: vscode.ExtensionContext) {
 	}
 
 	context.subscriptions.push(...[
-		vscode.commands.registerCommand('cgware-vscode-cmake.refresh', _ => cmake_refresh()),
-		vscode.commands.registerCommand('cgware-vscode-cmake.generate', _ => cmake.generate(terminal)),
-		vscode.commands.registerCommand('cgware-vscode-cmake.config', (config: CMakeConfig) => lastConfig = config),
+		vscode.commands.registerCommand('cgware-vscode-cmake.refresh', _ => {
+			cmake_refresh();
+			cmake.generate(terminal, lastConfig);
+		}),
+		vscode.commands.registerCommand('cgware-vscode-cmake.generate', _ => cmake.generate(terminal, lastConfig)),
+		vscode.commands.registerCommand('cgware-vscode-cmake.config', (config: CMakeConfig) => {
+			lastConfig = config;
+			cmake.generate(terminal, lastConfig);
+		}),
 		vscode.commands.registerCommand('cgware-vscode-cmake.build', (target: CMakeTarget) => {
 			target.launch(cmake, terminal, lastConfig);
 			lastTarget = target;
