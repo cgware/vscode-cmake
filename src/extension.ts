@@ -21,20 +21,15 @@ const configs: { [key in CMakeConfig]: string } = {
 	[CMakeConfig.RELEASE]: 'Release',
 };
 
-abstract class CMakeTarget extends ProjectItem {
+abstract class CMakeTarget {
 	public name: string;
 	public type: CMakeTargetType;
 	public outDir: string[] = new Array(Object.keys(CMakeConfig).length);
 	public outName: string | undefined;
 
 	protected constructor(name: string, type: CMakeTargetType) {
-		super(name, vscode.TreeItemCollapsibleState.None);
 		this.name = name;
 		this.type = type;
-	}
-
-	getChildren(): ProjectItem[] {
-		return [];
 	}
 
 	protected build(cmake: CMake, terminal: Terminal, config: CMakeConfig) {
@@ -51,11 +46,6 @@ abstract class CMakeTarget extends ProjectItem {
 class CMakeBuildTarget extends CMakeTarget {
 	constructor(name: string) {
 		super(name, CMakeTargetType.BUILD);
-		this.command = {
-			command: 'cgware-vscode-cmake.build',
-			title: 'Build ' + name,
-			arguments: [this]
-		};
 	}
 
 	launch(cmake: CMake, terminal: Terminal, config: CMakeConfig) {
@@ -66,11 +56,6 @@ class CMakeBuildTarget extends CMakeTarget {
 class CMakeRunTarget extends CMakeTarget {
 	constructor(name: string, outDir: string, outName: string) {
 		super(name, CMakeTargetType.RUN);
-		this.command = {
-			command: 'cgware-vscode-cmake.run',
-			title: 'Run ' + name,
-			arguments: [this]
-		};
 		this.outDir.fill(outDir);
 		this.outName = outName;
 	}
@@ -164,35 +149,73 @@ class Terminal {
 }
 
 class LaunchItem extends ProjectItem {
-	private cmake: CMake;
-	private type: CMakeTargetType;
-
-	protected constructor(cmake: CMake, type: CMakeTargetType, label: string) {
-		super(label, vscode.TreeItemCollapsibleState.Expanded);
-		this.cmake = cmake;
-		this.type = type;
+	protected constructor(target: CMakeTarget, selected: CMakeTarget | undefined) {
+		super(target.name + (target === selected ? ' (selected)' : ''), vscode.TreeItemCollapsibleState.None);
 	}
 
 	getChildren(): ProjectItem[] {
-		return this.cmake.targets.filter(target => target.type === this.type);
+		return [];
 	}
 }
 
 class BuildItem extends LaunchItem {
-	constructor(cmake: CMake) {
-		super(cmake, CMakeTargetType.BUILD, "Build");
+	constructor(target: CMakeTarget, selected: CMakeTarget | undefined) {
+		super(target, selected);
+		this.command = {
+			command: 'cgware-vscode-cmake.build',
+			title: 'Build ' + target.name,
+			arguments: [target]
+		};
 	}
 }
 
 class RunItem extends LaunchItem {
-	constructor(cmake: CMake) {
-		super(cmake, CMakeTargetType.RUN, "Run");
+	constructor(target: CMakeTarget, selected: CMakeTarget | undefined) {
+		super(target, selected);
+		this.command = {
+			command: 'cgware-vscode-cmake.run',
+			title: 'Run ' + target.name,
+			arguments: [target]
+		};
+	}
+}
+
+abstract class LaunchItems extends ProjectItem {
+	protected cmake: CMake;
+	protected type: CMakeTargetType;
+	protected selected: CMakeTarget | undefined;
+
+	protected constructor(cmake: CMake, type: CMakeTargetType, name: string, selected: CMakeTarget | undefined) {
+		super(name, vscode.TreeItemCollapsibleState.Expanded);
+		this.cmake = cmake;
+		this.type = type;
+		this.selected = selected;
+	}
+}
+
+class BuildItems extends LaunchItems {
+	constructor(cmake: CMake, selected: CMakeTarget | undefined) {
+		super(cmake, CMakeTargetType.BUILD, 'Build', selected);
+	}
+
+	getChildren(): ProjectItem[] {
+		return this.cmake.targets.filter(target => target.type === this.type).map(target => new BuildItem(target, this.selected));
+	}
+}
+
+class RunItems extends LaunchItems {
+	constructor(cmake: CMake, selected: CMakeTarget | undefined) {
+		super(cmake, CMakeTargetType.RUN, "Run", selected);
+	}
+
+	getChildren(): ProjectItem[] {
+		return this.cmake.targets.filter(target => target.type === this.type).map(target => new RunItem(target, this.selected));
 	}
 }
 
 class ConfigItem extends ProjectItem {
-	constructor(config: CMakeConfig) {
-		super(configs[config], vscode.TreeItemCollapsibleState.None);
+	constructor(config: CMakeConfig, selected: CMakeConfig) {
+		super(configs[config] + (config === selected ? ' (selected)' : ''), vscode.TreeItemCollapsibleState.None);
 		this.command = {
 			command: 'cgware-vscode-cmake.config',
 			title: configs[config],
@@ -205,13 +228,18 @@ class ConfigItem extends ProjectItem {
 	}
 }
 
-class ConfigsItem extends ProjectItem {
-	constructor() {
+class ConfigItems extends ProjectItem {
+	private selected: CMakeConfig;
+
+	constructor(selected: CMakeConfig) {
 		super('Config', vscode.TreeItemCollapsibleState.Expanded);
+		this.selected = selected;
 	}
 
 	getChildren(): ProjectItem[] {
-		return Object.values(CMakeConfig).map((_, config) => new ConfigItem(config));
+		return Object.values(CMakeConfig)
+			.filter((config, _) => typeof config === 'string')
+			.map((_, config) => new ConfigItem(config, this.selected));
 	}
 }
 
@@ -219,9 +247,13 @@ class ProjectProvider implements vscode.TreeDataProvider<ProjectItem> {
 	private _onDidChangeTreeData: vscode.EventEmitter<ProjectItem | undefined | void> = new vscode.EventEmitter<ProjectItem | undefined | void>();
 	readonly onDidChangeTreeData: vscode.Event<ProjectItem | undefined | void> = this._onDidChangeTreeData.event;
 	private cmake: CMake;
+	public target: CMakeTarget | undefined;
+	public config: CMakeConfig;
 
 	constructor(cmake: CMake) {
 		this.cmake = cmake;
+		this.target = this.cmake.targets.find((item: CMakeTarget) => item.equals(this.target)) || this.cmake.targets.at(0);
+		this.config = CMakeConfig.DEBUG;
 	}
 
 	getTreeItem(element: ProjectItem): vscode.TreeItem {
@@ -231,9 +263,9 @@ class ProjectProvider implements vscode.TreeDataProvider<ProjectItem> {
 	getChildren(element?: ProjectItem): ProjectItem[] {
 		if (!element) {
 			return [
-				new BuildItem(this.cmake),
-				new RunItem(this.cmake),
-				new ConfigsItem(),
+				new BuildItems(this.cmake, this.target),
+				new RunItems(this.cmake, this.target),
+				new ConfigItems(this.config),
 			];
 		}
 
@@ -242,6 +274,17 @@ class ProjectProvider implements vscode.TreeDataProvider<ProjectItem> {
 
 	setCMake(cmake: CMake) {
 		this.cmake = cmake;
+		this.target = this.cmake.targets.find((item: CMakeTarget) => item.equals(this.target)) || this.cmake.targets.at(0);
+		this._onDidChangeTreeData.fire();
+	}
+
+	setConfig(config: CMakeConfig) {
+		this.config = config;
+		this._onDidChangeTreeData.fire();
+	}
+
+	setTarget(target: CMakeTarget) {
+		this.target = target;
 		this._onDidChangeTreeData.fire();
 	}
 }
@@ -256,8 +299,6 @@ export function activate(context: vscode.ExtensionContext) {
 
 	let terminal = new Terminal();
 	let cmake: CMake = new CMake(wf);
-	let lastTarget: CMakeTarget | undefined;
-	let lastConfig = CMakeConfig.DEBUG;
 	const projectProvider = new ProjectProvider(cmake);
 
 	cmake_refresh();
@@ -375,35 +416,33 @@ export function activate(context: vscode.ExtensionContext) {
 	function cmake_refresh() {
 		cmake = parse_cmake(undefined, new CMake(wf));
 		projectProvider.setCMake(cmake);
-
-		lastTarget = cmake.targets.find((item: CMakeTarget) => item.equals(lastTarget)) || cmake.targets.at(0);
 	}
 
 	context.subscriptions.push(...[
 		vscode.commands.registerCommand('cgware-vscode-cmake.refresh', _ => {
 			cmake_refresh();
-			cmake.generate(terminal, lastConfig);
+			cmake.generate(terminal, projectProvider.config);
 		}),
-		vscode.commands.registerCommand('cgware-vscode-cmake.generate', _ => cmake.generate(terminal, lastConfig)),
+		vscode.commands.registerCommand('cgware-vscode-cmake.generate', _ => cmake.generate(terminal, projectProvider.config)),
 		vscode.commands.registerCommand('cgware-vscode-cmake.config', (config: CMakeConfig) => {
-			lastConfig = config;
-			cmake.generate(terminal, lastConfig);
+			projectProvider.setConfig(config);
+			cmake.generate(terminal, projectProvider.config);
 		}),
 		vscode.commands.registerCommand('cgware-vscode-cmake.build', (target: CMakeTarget) => {
-			target.launch(cmake, terminal, lastConfig);
-			lastTarget = target;
+			projectProvider.setTarget(target);
+			target.launch(cmake, terminal, projectProvider.config);
 		}),
 		vscode.commands.registerCommand('cgware-vscode-cmake.run', (target: CMakeTarget) => {
-			target.launch(cmake, terminal, lastConfig);
-			lastTarget = target;
+			projectProvider.setTarget(target);
+			target.launch(cmake, terminal, projectProvider.config);
 		}),
 		vscode.commands.registerCommand('cgware-vscode-cmake.launch', _ => {
-			if (!lastTarget) {
+			if (!projectProvider.target) {
 				vscode.window.showErrorMessage('No target selected');
 				return;
 			}
 
-			lastTarget.launch(cmake, terminal, lastConfig);
+			projectProvider.target.launch(cmake, terminal, projectProvider.config);
 		}),
 	]);
 
