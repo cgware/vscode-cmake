@@ -39,7 +39,7 @@ const commands: { [key in string]: (cmake: CMake, subdir: string | undefined, ar
 		cmake.targets.push(new CMakeBuildTarget(args[0]));
 	},
 	'add_subdirectory': (cmake: CMake, subdir: string | undefined, args: string[]) => {
-		parse_cmake(join(...(subdir ? [subdir] : []), args[0]), cmake);
+		parseCMake(join(...(subdir ? [subdir] : []), args[0]), cmake);
 	},
 	'add_custom_target': (cmake: CMake, _, args: string[]) => {
 		cmake.targets.push(new CMakeBuildTarget(args[0]));
@@ -67,7 +67,7 @@ const commands: { [key in string]: (cmake: CMake, subdir: string | undefined, ar
 	},
 };
 
-export function parse_cmake(subdir: string | undefined, cmake: CMake): CMake {
+export function parseCMake(subdir: string | undefined, cmake: CMake): CMake {
 	let file_path = join(cmake.rootDir, ...(subdir ? [subdir] : []), 'CMakeLists.txt');
 
 	if (!existsSync(file_path)) {

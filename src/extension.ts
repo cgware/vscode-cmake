@@ -1,6 +1,6 @@
 import { CMake, CMakeConfig, CMakeTarget } from './cmake';
 import { Terminal } from './terminal';
-import { parse_cmake } from './parse_cmake';
+import { parseCMake } from './parseCMake';
 import { ProjectProvider } from './projectProvider';
 import { commands, ExtensionContext, window, workspace } from 'vscode';
 
@@ -28,7 +28,7 @@ export function activate(context: ExtensionContext) {
 	});
 
 	function cmake_refresh() {
-		cmake = parse_cmake(undefined, new CMake(wf));
+		cmake = parseCMake(undefined, new CMake(wf));
 		projectProvider.setCMake(cmake);
 	}
 
