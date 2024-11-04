@@ -352,6 +352,10 @@ export function activate(context: vscode.ExtensionContext) {
 					parse_cmake(path.join(...(subdir ? [subdir] : []), cmd.args[0]), cmake);
 					break;
 				}
+				case 'add_custom_target': {
+					cmake.targets.push(new CMakeBuildTarget(cmd.args[0]));
+					break;
+				}
 				case 'set_target_properties': {
 					let targets: CMakeTarget[] = [];
 					let i = 0;
@@ -402,6 +406,10 @@ export function activate(context: vscode.ExtensionContext) {
 							}
 						}
 					}
+					break;
+				}
+				case 'enable_testing': {
+					cmake.targets.push(new CMakeBuildTarget('test'));
 					break;
 				}
 				default: {
