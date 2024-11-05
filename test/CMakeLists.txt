@@ -12,7 +12,9 @@ set_target_properties(main PROPERTIES
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-	target_compile_options(main PRIVATE -O0 -ggdb)
+	if(NOT MSVC)
+		target_compile_options(main PRIVATE -O0 -ggdb)
+	endif()
 endif()
 
 add_executable(main_test test.c)

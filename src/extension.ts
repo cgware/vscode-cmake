@@ -16,7 +16,7 @@ export function activate(context: ExtensionContext) {
 	let cmake: CMake = new CMake(wf);
 	const projectProvider = new ProjectProvider(cmake);
 
-	cmake_refresh();
+	commands.executeCommand('cgware-vscode-cmake.refresh');
 
 	workspace.onDidSaveTextDocument((document) => {
 		const path = document.fileName;
@@ -33,30 +33,40 @@ export function activate(context: ExtensionContext) {
 		return cmake.generate(terminal, projectProvider.config);
 	}
 
-	context.subscriptions.push(...[
-		commands.registerCommand('cgware-vscode-cmake.refresh', async _ => {
-			await cmake_refresh();
-		}),
-		commands.registerCommand('cgware-vscode-cmake.generate', async _ => await cmake.generate(terminal, projectProvider.config)),
-		commands.registerCommand('cgware-vscode-cmake.config', async (config: CMakeConfig) => {
-			projectProvider.setConfig(config);
-			await cmake.generate(terminal, projectProvider.config);
-		}),
-		commands.registerCommand('cgware-vscode-cmake.build', async (target: CMakeTarget) => {
-			projectProvider.setTarget(target);
-			await target.launch(cmake, terminal, projectProvider.config);
-		}),
-		commands.registerCommand('cgware-vscode-cmake.run', async (target: CMakeTarget) => {
-			projectProvider.setTarget(target);
-			await target.launch(cmake, terminal, projectProvider.config);
-		}),
-		commands.registerCommand('cgware-vscode-cmake.launch', async _ => {
-			if (!projectProvider.target) {
-				window.showErrorMessage('No target selected');
-				return;
+	function registerCommand(cmd: string, action: (...args: any[]) => Promise<void>) {
+		return commands.registerCommand(cmd, async (args: any[]) => {
+			try {
+				await action(args);
+			} catch (err) {
+				window.showErrorMessage(err as string);
 			}
+		});
+	}
 
-			await projectProvider.target.launch(cmake, terminal, projectProvider.config);
+	context.subscriptions.push(...[
+		registerCommand('cgware-vscode-cmake.refresh', _ => {
+			return cmake_refresh();
+		}),
+		registerCommand('cgware-vscode-cmake.generate', _ => {
+			return cmake.generate(terminal, projectProvider.config);
+		}),
+		registerCommand('cgware-vscode-cmake.config', (config: CMakeConfig) => {
+			projectProvider.setConfig(config);
+			return cmake.generate(terminal, projectProvider.config);
+		}),
+		registerCommand('cgware-vscode-cmake.build', (target: CMakeTarget) => {
+			projectProvider.setTarget(target);
+			return target.launch(cmake, terminal, projectProvider.config);
+		}),
+		registerCommand('cgware-vscode-cmake.run', (target: CMakeTarget) => {
+			projectProvider.setTarget(target);
+			return target.launch(cmake, terminal, projectProvider.config);
+		}),
+		registerCommand('cgware-vscode-cmake.launch', _ => {
+			if (!projectProvider.target) {
+				throw Error('No target selected');
+			}
+			return projectProvider.target.launch(cmake, terminal, projectProvider.config);
 		}),
 	]);
 

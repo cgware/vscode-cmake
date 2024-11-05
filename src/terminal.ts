@@ -55,10 +55,23 @@ export class Terminal {
 		return new Promise(async (resolve, reject) => {
 			try {
 				const exe = (await this.shell()).executeCommand(cmd);
+				let subshell = false;
 				let dispose: Disposable | undefined = window.onDidEndTerminalShellExecution(async event => {
-					if (exe === event.execution) {
-						for await (const _ of event.execution.read()) { }
-						event.exitCode === 0 ? resolve() : reject(event.exitCode);
+					if (exe === event.execution || subshell) {
+						const stream = event.execution.read();
+						for await (const _ of stream) { }
+
+						if (event.exitCode === undefined) {
+							subshell = true;
+							return;
+						}
+
+						subshell = false;
+
+						if (event.exitCode === 0) {
+							resolve();
+						}
+
 						dispose?.dispose();
 						dispose = undefined;
 					}
