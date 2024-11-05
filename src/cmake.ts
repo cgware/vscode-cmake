@@ -29,11 +29,11 @@ export abstract class CMakeTarget {
 		this.type = type;
 	}
 
-	protected build(cmake: CMake, terminal: Terminal, config: CMakeConfig) {
-		cmake.build(terminal, this.name, config);
+	protected build(cmake: CMake, terminal: Terminal, config: CMakeConfig): Promise<void>  {
+		return cmake.build(terminal, this.name, config);
 	}
 
-	abstract launch(cmake: CMake, terminal: Terminal, config: CMakeConfig): void;
+	abstract launch(cmake: CMake, terminal: Terminal, config: CMakeConfig): Promise<void> ;
 
 	equals(other: CMakeTarget | undefined) {
 		return other && this.name === other.name && this.type === other.type;
@@ -45,8 +45,8 @@ export class CMakeBuildTarget extends CMakeTarget {
 		super(name, CMakeTargetType.BUILD);
 	}
 
-	launch(cmake: CMake, terminal: Terminal, config: CMakeConfig) {
-		this.build(cmake, terminal, config);
+	launch(cmake: CMake, terminal: Terminal, config: CMakeConfig): Promise<void>  {
+		return this.build(cmake, terminal, config);
 	}
 }
 
@@ -57,13 +57,20 @@ export class CMakeRunTarget extends CMakeTarget {
 		this.outName = outName;
 	}
 
-	run(cmake: CMake, terminal: Terminal, config: CMakeConfig) {
-		this.build(cmake, terminal, config);
-		cmake.run(terminal, this, config);
+	run(cmake: CMake, terminal: Terminal, config: CMakeConfig): Promise<void>  {
+		return new Promise(async (resolve, reject) => {
+			try {
+				await this.build(cmake, terminal, config);
+				await cmake.run(terminal, this, config);
+				resolve();
+			} catch (err) {
+				reject(err);
+			}
+		});
 	}
 
-	launch(cmake: CMake, terminal: Terminal, config: CMakeConfig) {
-		this.run(cmake, terminal, config);
+	launch(cmake: CMake, terminal: Terminal, config: CMakeConfig): Promise<void>  {
+		return this.run(cmake, terminal, config);
 	}
 }
 
@@ -83,46 +90,60 @@ export class CMake {
 		this.buildDir = join(rootDir, 'build');
 	}
 
-	generate(terminal: Terminal, config: CMakeConfig) {
-		terminal.exec('cmake -S ' + this.srcDir + ' -B ' + this.buildDir + ' -DCMAKE_BUILD_TYPE=' + configs[config]);
+	generate(terminal: Terminal, config: CMakeConfig): Promise<void> {
+		return terminal.exec('cmake -S ' + this.srcDir + ' -B ' + this.buildDir + ' -DCMAKE_BUILD_TYPE=' + configs[config]);
 	}
 
-	build(terminal: Terminal, target: string, config: CMakeConfig) {
-		if (!existsSync(this.buildDir)) {
-			this.generate(terminal, config);
-		}
+	build(terminal: Terminal, target: string, config: CMakeConfig): Promise<void> {
+		return new Promise(async (resolve, reject) => {
+			try {
+				if (!existsSync(this.buildDir)) {
+					await this.generate(terminal, config);
+				}
 
-		terminal.exec('cmake --build ' + this.buildDir + ' --target ' + target + ' --config ' + configs[config]);
+				await terminal.exec('cmake --build ' + this.buildDir + ' --target ' + target + ' --config ' + configs[config]);
+				resolve();
+			} catch (err) {
+				reject(err);
+			}
+		});
 	}
 
-	run(terminal: Terminal, target: CMakeRunTarget, config: CMakeConfig) {
-		if (!target.outDir || !target.outName) {
-			return;
-		}
+	run(terminal: Terminal, target: CMakeRunTarget, config: CMakeConfig): Promise<void> {
+		return new Promise(async (resolve, reject) => {
+			if (!target.outDir || !target.outName) {
+				return reject(new Error('No output file'));
+			}
 
-		let cmd = join(target.outDir[config], target.outName);
-		cmd = cmd.replaceAll('${CMAKE_SOURCE_DIR}', this.srcDir);
+			let cmd = join(target.outDir[config], target.outName);
+			cmd = cmd.replaceAll('${CMAKE_SOURCE_DIR}', this.srcDir);
 
-		switch (config) {
-			case CMakeConfig.DEBUG: {
-				debug.startDebugging(undefined, {
-					"type": "cppdbg",
-					"name": "GDB",
-					"request": "launch",
-					"program": cmd,
-					"stopAtEntry": false,
-					"externalConsole": false,
-					"cwd": this.buildDir
-				});
-				break;
+			try {
+				switch (config) {
+					case CMakeConfig.DEBUG: {
+						debug.startDebugging(undefined, {
+							"type": "cppdbg",
+							"name": "GDB",
+							"request": "launch",
+							"program": cmd,
+							"stopAtEntry": false,
+							"externalConsole": false,
+							"cwd": this.buildDir
+						});
+						break;
+					}
+					case CMakeConfig.RELEASE: {
+						await terminal.exec(cmd);
+						break;
+					}
+					default: {
+						break;
+					}
+				}
+				resolve();
+			} catch (err) {
+				reject(err);
 			}
-			case CMakeConfig.RELEASE: {
-				terminal.exec(cmd);
-				break;
-			}
-			default: {
-				break;
-			}
-		}
+		});
 	}
 }

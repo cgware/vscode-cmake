@@ -1,19 +1,71 @@
-import { Terminal as VSTerminal, window } from "vscode";
+import { Disposable, TerminalShellIntegration, Terminal as VSTerminal, window } from "vscode";
 
 export class Terminal {
 	private terminal: VSTerminal | undefined;
+	private active: boolean;
 
 	constructor() {
-		window.onDidCloseTerminal((closedTerminal) => {
-			if (closedTerminal === this.terminal) {
-				this.terminal = undefined;
+		this.active = false;
+
+		window.onDidCloseTerminal(terminal => {
+			if (terminal !== this.terminal) {
+				return;
 			}
+
+			this.terminal = undefined;
+			this.active = false;
+		});
+
+		window.onDidChangeActiveTerminal(terminal => {
+			this.active = this.terminal === terminal;
 		});
 	}
 
-	exec(cmd: string) {
-		this.terminal = this.terminal || window.createTerminal('cmake');
-		this.terminal.show();
-		this.terminal.sendText(cmd, true);
+	private shell(): Promise<TerminalShellIntegration> {
+		return new Promise(resolve => {
+			if (!this.terminal) {
+				this.terminal = window.createTerminal('cmake');
+				this.terminal.show();
+				this.active = true;
+			}
+
+			if (!this.active) {
+				this.terminal.show();
+				this.active = true;
+			}
+
+			if (this.terminal.shellIntegration !== undefined) {
+				resolve(this.terminal.shellIntegration);
+				return;
+			}
+
+			let disposal: Disposable | undefined = window.onDidChangeTerminalShellIntegration(({ terminal, shellIntegration }) => {
+				if (terminal !== this.terminal) {
+					return;
+				}
+
+				resolve(shellIntegration);
+				disposal?.dispose();
+				disposal = undefined;
+			});
+		});
+	}
+
+	exec(cmd: string): Promise<void> {
+		return new Promise(async (resolve, reject) => {
+			try {
+				const exe = (await this.shell()).executeCommand(cmd);
+				let dispose: Disposable | undefined = window.onDidEndTerminalShellExecution(async event => {
+					if (exe === event.execution) {
+						for await (const _ of event.execution.read()) { }
+						event.exitCode === 0 ? resolve() : reject(event.exitCode);
+						dispose?.dispose();
+						dispose = undefined;
+					}
+				});
+			} catch (err) {
+				reject(err);
+			}
+		});
 	}
 }

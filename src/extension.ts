@@ -27,36 +27,36 @@ export function activate(context: ExtensionContext) {
 		commands.executeCommand('cgware-vscode-cmake.refresh');
 	});
 
-	function cmake_refresh() {
+	function cmake_refresh(): Promise<void> {
 		cmake = parseCMake(undefined, new CMake(wf));
 		projectProvider.setCMake(cmake);
+		return cmake.generate(terminal, projectProvider.config);
 	}
 
 	context.subscriptions.push(...[
-		commands.registerCommand('cgware-vscode-cmake.refresh', _ => {
-			cmake_refresh();
-			cmake.generate(terminal, projectProvider.config);
+		commands.registerCommand('cgware-vscode-cmake.refresh', async _ => {
+			await cmake_refresh();
 		}),
-		commands.registerCommand('cgware-vscode-cmake.generate', _ => cmake.generate(terminal, projectProvider.config)),
-		commands.registerCommand('cgware-vscode-cmake.config', (config: CMakeConfig) => {
+		commands.registerCommand('cgware-vscode-cmake.generate', async _ => await cmake.generate(terminal, projectProvider.config)),
+		commands.registerCommand('cgware-vscode-cmake.config', async (config: CMakeConfig) => {
 			projectProvider.setConfig(config);
-			cmake.generate(terminal, projectProvider.config);
+			await cmake.generate(terminal, projectProvider.config);
 		}),
-		commands.registerCommand('cgware-vscode-cmake.build', (target: CMakeTarget) => {
+		commands.registerCommand('cgware-vscode-cmake.build', async (target: CMakeTarget) => {
 			projectProvider.setTarget(target);
-			target.launch(cmake, terminal, projectProvider.config);
+			await target.launch(cmake, terminal, projectProvider.config);
 		}),
-		commands.registerCommand('cgware-vscode-cmake.run', (target: CMakeTarget) => {
+		commands.registerCommand('cgware-vscode-cmake.run', async (target: CMakeTarget) => {
 			projectProvider.setTarget(target);
-			target.launch(cmake, terminal, projectProvider.config);
+			await target.launch(cmake, terminal, projectProvider.config);
 		}),
-		commands.registerCommand('cgware-vscode-cmake.launch', _ => {
+		commands.registerCommand('cgware-vscode-cmake.launch', async _ => {
 			if (!projectProvider.target) {
 				window.showErrorMessage('No target selected');
 				return;
 			}
 
-			projectProvider.target.launch(cmake, terminal, projectProvider.config);
+			await projectProvider.target.launch(cmake, terminal, projectProvider.config);
 		}),
 	]);
 
