@@ -27,6 +27,10 @@
         "title": "Config"
       },
       {
+        "command": "cgware-vscode-cmake.debugger",
+        "title": "Debugger"
+      },
+      {
         "command": "cgware-vscode-cmake.build",
         "title": "Build"
       },

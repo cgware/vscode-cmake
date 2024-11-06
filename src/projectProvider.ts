@@ -100,17 +100,51 @@ class ConfigItems extends ProjectItem {
 	}
 }
 
+class DebugerItem extends ProjectItem {
+	constructor(name: string, selected: string) {
+		super(name + (name === selected ? ' (selected)' : ''), TreeItemCollapsibleState.None);
+		this.command = {
+			command: 'cgware-vscode-cmake.debugger',
+			title: name,
+			arguments: [name]
+		};
+	}
+
+	getChildren(): ProjectItem[] {
+		return [];
+	}
+}
+
+
+class DebuggerItems extends ProjectItem {
+	private selected: string;
+
+	constructor(dbg: string) {
+		super('Debugger', TreeItemCollapsibleState.Expanded);
+		this.selected = dbg;
+	}
+
+	getChildren(): ProjectItem[] {
+		return [
+			new DebugerItem('cppdbg', this.selected),
+			new DebugerItem('cppvsdbg', this.selected),
+		];
+	}
+}
+
 export class ProjectProvider implements TreeDataProvider<ProjectItem> {
 	private _onDidChangeTreeData: EventEmitter<ProjectItem | undefined | void> = new EventEmitter<ProjectItem | undefined | void>();
 	readonly onDidChangeTreeData: Event<ProjectItem | undefined | void> = this._onDidChangeTreeData.event;
 	private cmake: CMake;
 	public target: CMakeTarget | undefined;
 	public config: CMakeConfig;
+	public dbg: string;
 
 	constructor(cmake: CMake) {
 		this.cmake = cmake;
 		this.target = this.cmake.targets.find((item: CMakeTarget) => item.equals(this.target)) || this.cmake.targets.at(0);
 		this.config = CMakeConfig.DEBUG;
+		this.dbg = process.platform === 'win32' ? 'cppvsdbg' : 'cppdbg';
 	}
 
 	getTreeItem(element: ProjectItem): TreeItem {
@@ -123,6 +157,7 @@ export class ProjectProvider implements TreeDataProvider<ProjectItem> {
 				new BuildItems(this.cmake, this.target),
 				new RunItems(this.cmake, this.target),
 				new ConfigItems(this.config),
+				new DebuggerItems(this.dbg),
 			];
 		}
 
@@ -137,6 +172,11 @@ export class ProjectProvider implements TreeDataProvider<ProjectItem> {
 
 	setConfig(config: CMakeConfig) {
 		this.config = config;
+		this._onDidChangeTreeData.fire();
+	}
+
+	setDebugger(dbg: string) {
+		this.dbg = dbg;
 		this._onDidChangeTreeData.fire();
 	}
 

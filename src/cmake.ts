@@ -33,7 +33,7 @@ export abstract class CMakeTarget {
 		return cmake.build(terminal, this.name, config);
 	}
 
-	abstract launch(cmake: CMake, terminal: Terminal, config: CMakeConfig): Promise<void>;
+	abstract launch(cmake: CMake, terminal: Terminal, config: CMakeConfig, dbg: string): Promise<void>;
 
 	equals(other: CMakeTarget | undefined) {
 		return other && this.name === other.name && this.type === other.type;
@@ -57,11 +57,11 @@ export class CMakeRunTarget extends CMakeTarget {
 		this.outName = outName;
 	}
 
-	run(cmake: CMake, terminal: Terminal, config: CMakeConfig): Promise<void> {
+	run(cmake: CMake, terminal: Terminal, config: CMakeConfig, dbg: string): Promise<void> {
 		return new Promise(async (resolve, reject) => {
 			try {
 				await this.build(cmake, terminal, config);
-				await cmake.run(terminal, this, config);
+				await cmake.run(terminal, this, config, dbg);
 				resolve();
 			} catch (err) {
 				reject(err);
@@ -69,8 +69,8 @@ export class CMakeRunTarget extends CMakeTarget {
 		});
 	}
 
-	launch(cmake: CMake, terminal: Terminal, config: CMakeConfig): Promise<void> {
-		return this.run(cmake, terminal, config);
+	launch(cmake: CMake, terminal: Terminal, config: CMakeConfig, dbg: string): Promise<void> {
+		return this.run(cmake, terminal, config, dbg);
 	}
 }
 
@@ -109,7 +109,7 @@ export class CMake {
 		});
 	}
 
-	run(terminal: Terminal, target: CMakeRunTarget, config: CMakeConfig): Promise<void> {
+	run(terminal: Terminal, target: CMakeRunTarget, config: CMakeConfig, dbg: string): Promise<void> {
 		return new Promise(async (resolve, reject) => {
 			if (!target.outDir || !target.outName) {
 				return reject(new Error('No output file'));
@@ -122,7 +122,7 @@ export class CMake {
 				switch (config) {
 					case CMakeConfig.DEBUG: {
 						debug.startDebugging(undefined, {
-							"type": process.platform === 'win32' ? 'cppvsdbg' : 'cppdbg',
+							"type": dbg,
 							"name": "GDB",
 							"request": "launch",
 							"program": cmd,

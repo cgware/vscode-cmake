@@ -54,19 +54,22 @@ export function activate(context: ExtensionContext) {
 			projectProvider.setConfig(config);
 			return cmake.generate(terminal, projectProvider.config);
 		}),
+		registerCommand('cgware-vscode-cmake.debugger', async (dbg: string) => {
+			projectProvider.setDebugger(dbg);
+		}),
 		registerCommand('cgware-vscode-cmake.build', (target: CMakeTarget) => {
 			projectProvider.setTarget(target);
-			return target.launch(cmake, terminal, projectProvider.config);
+			return target.launch(cmake, terminal, projectProvider.config, projectProvider.dbg);
 		}),
 		registerCommand('cgware-vscode-cmake.run', (target: CMakeTarget) => {
 			projectProvider.setTarget(target);
-			return target.launch(cmake, terminal, projectProvider.config);
+			return target.launch(cmake, terminal, projectProvider.config, projectProvider.dbg);
 		}),
 		registerCommand('cgware-vscode-cmake.launch', _ => {
 			if (!projectProvider.target) {
 				throw Error('No target selected');
 			}
-			return projectProvider.target.launch(cmake, terminal, projectProvider.config);
+			return projectProvider.target.launch(cmake, terminal, projectProvider.config, projectProvider.dbg);
 		}),
 	]);
 
