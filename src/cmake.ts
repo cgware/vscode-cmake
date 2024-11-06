@@ -127,7 +127,6 @@ export class CMake {
 							"request": "launch",
 							"program": cmd,
 							"stopAtEntry": false,
-							"externalConsole": false,
 							"cwd": this.buildDir
 						});
 						break;
