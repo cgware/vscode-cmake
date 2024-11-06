@@ -16,7 +16,7 @@ export function activate(context: ExtensionContext) {
 	let cmake: CMake = new CMake(wf);
 	const projectProvider = new ProjectProvider(cmake);
 
-	commands.executeCommand('cgware-vscode-cmake.refresh');
+	commands.executeCommand('cgware-vscode-cmake.generate');
 
 	workspace.onDidSaveTextDocument((document) => {
 		const path = document.fileName;
@@ -24,14 +24,8 @@ export function activate(context: ExtensionContext) {
 			return;
 		}
 
-		commands.executeCommand('cgware-vscode-cmake.refresh');
+		commands.executeCommand('cgware-vscode-cmake.generate');
 	});
-
-	function cmake_refresh(): Promise<void> {
-		cmake = parseCMake(undefined, new CMake(wf));
-		projectProvider.setCMake(cmake);
-		return cmake.generate(terminal, projectProvider.config);
-	}
 
 	function registerCommand(cmd: string, action: (...args: any[]) => Promise<void>) {
 		return commands.registerCommand(cmd, async (args: any[]) => {
@@ -44,10 +38,9 @@ export function activate(context: ExtensionContext) {
 	}
 
 	context.subscriptions.push(...[
-		registerCommand('cgware-vscode-cmake.refresh', _ => {
-			return cmake_refresh();
-		}),
 		registerCommand('cgware-vscode-cmake.generate', _ => {
+			cmake = parseCMake(undefined, new CMake(wf));
+			projectProvider.setCMake(cmake);
 			return cmake.generate(terminal, projectProvider.config);
 		}),
 		registerCommand('cgware-vscode-cmake.config', (config: CMakeConfig) => {

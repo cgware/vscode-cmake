@@ -15,32 +15,12 @@
   "contributes": {
     "commands": [
       {
-        "command": "cgware-vscode-cmake.refresh",
-        "title": "Refresh"
-      },
-      {
         "command": "cgware-vscode-cmake.generate",
-        "title": "Generate"
-      },
-      {
-        "command": "cgware-vscode-cmake.config",
-        "title": "Config"
-      },
-      {
-        "command": "cgware-vscode-cmake.debugger",
-        "title": "Debugger"
-      },
-      {
-        "command": "cgware-vscode-cmake.build",
-        "title": "Build"
-      },
-      {
-        "command": "cgware-vscode-cmake.run",
-        "title": "Run"
+        "title": "CMake: Generate"
       },
       {
         "command": "cgware-vscode-cmake.launch",
-        "title": "Launch"
+        "title": "CMake: Launch"
       }
     ],
     "keybindings": [
