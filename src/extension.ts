@@ -41,28 +41,32 @@ export function activate(context: ExtensionContext) {
 		registerCommand('cgware-vscode-cmake.generate', _ => {
 			cmake = parseCMake(undefined, new CMake(wf));
 			projectProvider.setCMake(cmake);
-			return cmake.generate(terminal, projectProvider.config);
+			return cmake.generate(terminal, projectProvider.config, projectProvider.arch);
 		}),
 		registerCommand('cgware-vscode-cmake.config', (config: CMakeConfig) => {
 			projectProvider.setConfig(config);
-			return cmake.generate(terminal, projectProvider.config);
+			return cmake.generate(terminal, projectProvider.config, projectProvider.arch);
+		}),
+		registerCommand('cgware-vscode-cmake.arch', async (arch: string) => {
+			projectProvider.setArch(arch);
+			return cmake.generate(terminal, projectProvider.config, projectProvider.arch);
 		}),
 		registerCommand('cgware-vscode-cmake.debugger', async (dbg: string) => {
 			projectProvider.setDebugger(dbg);
 		}),
 		registerCommand('cgware-vscode-cmake.build', (target: CMakeTarget) => {
 			projectProvider.setTarget(target);
-			return target.launch(cmake, terminal, projectProvider.config, projectProvider.dbg);
+			return target.launch(cmake, terminal, projectProvider.config, projectProvider.arch, projectProvider.dbg);
 		}),
 		registerCommand('cgware-vscode-cmake.run', (target: CMakeTarget) => {
 			projectProvider.setTarget(target);
-			return target.launch(cmake, terminal, projectProvider.config, projectProvider.dbg);
+			return target.launch(cmake, terminal, projectProvider.config, projectProvider.arch, projectProvider.dbg);
 		}),
 		registerCommand('cgware-vscode-cmake.launch', _ => {
 			if (!projectProvider.target) {
 				throw Error('No target selected');
 			}
-			return projectProvider.target.launch(cmake, terminal, projectProvider.config, projectProvider.dbg);
+			return projectProvider.target.launch(cmake, terminal, projectProvider.config, projectProvider.arch, projectProvider.dbg);
 		}),
 	]);
 

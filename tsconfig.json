@@ -15,6 +15,6 @@
 		"noUnusedParameters": true,
 	},
 	"exclude": [
-		"test"
+		"examples"
 	]
 }

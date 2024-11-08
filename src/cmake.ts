@@ -29,11 +29,11 @@ export abstract class CMakeTarget {
 		this.type = type;
 	}
 
-	protected build(cmake: CMake, terminal: Terminal, config: CMakeConfig): Promise<void> {
-		return cmake.build(terminal, this.name, config);
+	protected build(cmake: CMake, terminal: Terminal, config: CMakeConfig, arch: string): Promise<void> {
+		return cmake.build(terminal, this.name, config, arch);
 	}
 
-	abstract launch(cmake: CMake, terminal: Terminal, config: CMakeConfig, dbg: string): Promise<void>;
+	abstract launch(cmake: CMake, terminal: Terminal, config: CMakeConfig, arch: string, dbg: string): Promise<void>;
 
 	equals(other: CMakeTarget | undefined) {
 		return other && this.name === other.name && this.type === other.type;
@@ -45,8 +45,8 @@ export class CMakeBuildTarget extends CMakeTarget {
 		super(name, CMakeTargetType.BUILD);
 	}
 
-	launch(cmake: CMake, terminal: Terminal, config: CMakeConfig): Promise<void> {
-		return this.build(cmake, terminal, config);
+	launch(cmake: CMake, terminal: Terminal, config: CMakeConfig, arch: string): Promise<void> {
+		return this.build(cmake, terminal, config, arch);
 	}
 }
 
@@ -57,10 +57,10 @@ export class CMakeRunTarget extends CMakeTarget {
 		this.outName = outName;
 	}
 
-	run(cmake: CMake, terminal: Terminal, config: CMakeConfig, dbg: string): Promise<void> {
+	run(cmake: CMake, terminal: Terminal, config: CMakeConfig, arch: string, dbg: string): Promise<void> {
 		return new Promise(async (resolve, reject) => {
 			try {
-				await this.build(cmake, terminal, config);
+				await this.build(cmake, terminal, config, arch);
 				await cmake.run(terminal, this, config, dbg);
 				resolve();
 			} catch (err) {
@@ -69,8 +69,8 @@ export class CMakeRunTarget extends CMakeTarget {
 		});
 	}
 
-	launch(cmake: CMake, terminal: Terminal, config: CMakeConfig, dbg: string): Promise<void> {
-		return this.run(cmake, terminal, config, dbg);
+	launch(cmake: CMake, terminal: Terminal, config: CMakeConfig, arch: string, dbg: string): Promise<void> {
+		return this.run(cmake, terminal, config, arch, dbg);
 	}
 }
 
@@ -90,15 +90,15 @@ export class CMake {
 		this.buildDir = join(rootDir, 'build');
 	}
 
-	generate(terminal: Terminal, config: CMakeConfig): Promise<void> {
-		return terminal.exec('cmake -S ' + this.srcDir + ' -B ' + this.buildDir + ' -DCMAKE_BUILD_TYPE=' + configs[config]);
+	generate(terminal: Terminal, config: CMakeConfig, arch: string): Promise<void> {
+		return terminal.exec('cmake -S ' + this.srcDir + ' -B ' + this.buildDir + ' -DCMAKE_BUILD_TYPE=' + configs[config] + ' -DARCH=' + arch);
 	}
 
-	build(terminal: Terminal, target: string, config: CMakeConfig): Promise<void> {
+	build(terminal: Terminal, target: string, config: CMakeConfig, arch: string): Promise<void> {
 		return new Promise(async (resolve, reject) => {
 			try {
 				if (!existsSync(this.buildDir)) {
-					await this.generate(terminal, config);
+					await this.generate(terminal, config, arch);
 				}
 
 				await terminal.exec('cmake --build ' + this.buildDir + ' --target ' + target + ' --config ' + configs[config]);

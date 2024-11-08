@@ -132,6 +132,38 @@ class DebuggerItems extends ProjectItem {
 	}
 }
 
+class ArchItem extends ProjectItem {
+	constructor(name: string, selected: string) {
+		super(name + (name === selected ? ' (selected)' : ''), TreeItemCollapsibleState.None);
+		this.command = {
+			command: 'cgware-vscode-cmake.arch',
+			title: name,
+			arguments: [name]
+		};
+	}
+
+	getChildren(): ProjectItem[] {
+		return [];
+	}
+}
+
+
+class ArchItems extends ProjectItem {
+	private selected: string;
+
+	constructor(arch: string) {
+		super('Arch', TreeItemCollapsibleState.Expanded);
+		this.selected = arch;
+	}
+
+	getChildren(): ProjectItem[] {
+		return [
+			new ArchItem('x86', this.selected),
+			new ArchItem('x64', this.selected),
+		];
+	}
+}
+
 export class ProjectProvider implements TreeDataProvider<ProjectItem> {
 	private _onDidChangeTreeData: EventEmitter<ProjectItem | undefined | void> = new EventEmitter<ProjectItem | undefined | void>();
 	readonly onDidChangeTreeData: Event<ProjectItem | undefined | void> = this._onDidChangeTreeData.event;
@@ -139,12 +171,14 @@ export class ProjectProvider implements TreeDataProvider<ProjectItem> {
 	public target: CMakeTarget | undefined;
 	public config: CMakeConfig;
 	public dbg: string;
+	public arch: string;
 
 	constructor(cmake: CMake) {
 		this.cmake = cmake;
 		this.target = this.cmake.targets.find((item: CMakeTarget) => item.equals(this.target)) || this.cmake.targets.at(0);
 		this.config = CMakeConfig.DEBUG;
 		this.dbg = process.platform === 'win32' ? 'cppvsdbg' : 'cppdbg';
+		this.arch = (process.arch === 'ia32' || process.arch === 'arm') ? 'x86' : 'x64';
 	}
 
 	getTreeItem(element: ProjectItem): TreeItem {
@@ -158,6 +192,7 @@ export class ProjectProvider implements TreeDataProvider<ProjectItem> {
 				new RunItems(this.cmake, this.target),
 				new ConfigItems(this.config),
 				new DebuggerItems(this.dbg),
+				new ArchItems(this.arch),
 			];
 		}
 
@@ -177,6 +212,11 @@ export class ProjectProvider implements TreeDataProvider<ProjectItem> {
 
 	setDebugger(dbg: string) {
 		this.dbg = dbg;
+		this._onDidChangeTreeData.fire();
+	}
+
+	setArch(arch: string) {
+		this.arch = arch;
 		this._onDidChangeTreeData.fire();
 	}
 
