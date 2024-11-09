@@ -71,7 +71,7 @@ export class CMakeRunTarget extends CMakeTarget {
 		return new Promise(async (resolve, reject) => {
 			try {
 				await this.build(cmake, terminal, config, arch);
-				await cmake.run(terminal, this, config, dbg);
+				await cmake.run(terminal, this, config, arch, dbg);
 				resolve();
 			} catch (err) {
 				reject(err);
@@ -130,7 +130,7 @@ export class CMake {
 		});
 	}
 
-	run(terminal: Terminal, target: CMakeRunTarget, config: CMakeConfig, dbg: string): Promise<void> {
+	run(terminal: Terminal, target: CMakeRunTarget, config: CMakeConfig, arch: string, dbg: string): Promise<void> {
 		return new Promise(async (resolve, reject) => {
 			if (!target.outDir || !target.outName) {
 				return reject(new Error('No output file'));
@@ -138,6 +138,7 @@ export class CMake {
 
 			let cmd = join(target.outDir[config], target.outName);
 			cmd = cmd.replaceAll('${CMAKE_SOURCE_DIR}', this.srcDir);
+			cmd = cmd.replaceAll('${ARCH}', arch);
 
 			try {
 				switch (config) {
