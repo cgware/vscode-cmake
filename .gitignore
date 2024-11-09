@@ -5,3 +5,4 @@ node_modules
 *.vsix
 /examples/build/
 /examples/bin/
+/examples/report/

@@ -4,6 +4,14 @@ project(cmake_test LANGUAGES C)
 
 enable_testing()
 
+find_program(LCOV lcov)
+find_program(GENHTML genhtml)
+add_custom_target(coverage
+	COMMAND ${LCOV} -q -c -d ${CMAKE_BINARY_DIR} -o ${CMAKE_BINARY_DIR}/lcov.info
+	COMMAND ${GENHTML} -q ${CMAKE_BINARY_DIR}/lcov.info -o ${CMAKE_SOURCE_DIR}/report/coverage
+	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
 if(ARCH STREQUAL "x64")
 	if(NOT MSVC)
 		set(CMAKE_C_FLAGS "-m64")
