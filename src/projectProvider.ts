@@ -115,7 +115,6 @@ class DebugerItem extends ProjectItem {
 	}
 }
 
-
 class DebuggerItems extends ProjectItem {
 	private selected: string;
 
@@ -146,7 +145,6 @@ class ArchItem extends ProjectItem {
 		return [];
 	}
 }
-
 
 class ArchItems extends ProjectItem {
 	private selected: string;

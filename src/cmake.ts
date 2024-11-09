@@ -1,6 +1,6 @@
 import { join } from 'path';
 import { debug } from "vscode";
-import { existsSync } from 'fs';
+import { existsSync, rmSync } from 'fs';
 import { Terminal } from "./terminal";
 
 export enum CMakeTargetType {
@@ -16,6 +16,16 @@ export enum CMakeConfig {
 export const configs: { [key in CMakeConfig]: string } = {
 	[CMakeConfig.DEBUG]: 'Debug',
 	[CMakeConfig.RELEASE]: 'Release',
+};
+
+export const arch_win: { [key in string]: string } = {
+	'x86': 'Win32',
+	'x64': 'x64',
+};
+
+export const target_win: { [key in string]: string } = {
+	'all': 'all_build',
+	'test': 'run_tests',
 };
 
 export abstract class CMakeTarget {
@@ -91,7 +101,14 @@ export class CMake {
 	}
 
 	generate(terminal: Terminal, config: CMakeConfig, arch: string): Promise<void> {
-		return terminal.exec('cmake -S ' + this.srcDir + ' -B ' + this.buildDir + ' -DCMAKE_BUILD_TYPE=' + configs[config] + ' -DARCH=' + arch);
+		rmSync(this.buildDir, { recursive: true, force: true });
+
+		return terminal.exec('cmake'
+			+ ` -S ${this.srcDir} -B ${this.buildDir}`
+			+ (process.platform === 'win32' ? ` -A ${arch_win[arch]}` : '')
+			+ ` -DCMAKE_BUILD_TYPE=${configs[config]}`
+			+ ` -DARCH=${arch}`
+		);
 	}
 
 	build(terminal: Terminal, target: string, config: CMakeConfig, arch: string): Promise<void> {
@@ -101,7 +118,11 @@ export class CMake {
 					await this.generate(terminal, config, arch);
 				}
 
-				await terminal.exec('cmake --build ' + this.buildDir + ' --target ' + target + ' --config ' + configs[config]);
+				await terminal.exec('cmake'
+					+ ` --build ${this.buildDir}`
+					+ ` --target ${(process.platform === 'win32' && target_win[target]) ? target_win[target] : target}`
+					+ ` --config ${configs[config]}`
+				);
 				resolve();
 			} catch (err) {
 				reject(err);
